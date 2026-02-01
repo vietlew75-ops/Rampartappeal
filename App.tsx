@@ -68,17 +68,20 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#020617]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-emerald-500/50">Initializing Secure Session</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#020617] relative overflow-x-hidden selection:bg-emerald-500/30">
-      {/* Background Ambience */}
-      <div className="fixed inset-0 pointer-events-none -z-0">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-emerald-500/10 blur-[160px] rounded-full"></div>
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-cyan-500/10 blur-[160px] rounded-full"></div>
+    <div className="min-h-screen flex flex-col bg-[#020617] relative selection:bg-emerald-500/30">
+      {/* Dynamic Background Blurs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
       </div>
 
       <Header 
@@ -89,56 +92,76 @@ const App: React.FC = () => {
         setActiveTab={setActiveTab}
       />
 
-      <main className="container mx-auto px-4 mt-8 max-w-5xl flex-grow relative z-10">
+      <main className="container mx-auto px-6 mt-12 max-w-6xl flex-grow relative z-10">
         {!user ? (
-          <div className="glass p-12 sm:p-24 rounded-[3rem] text-center space-y-16 shadow-2xl transition-all duration-700 border-white/5">
-            <div className="relative inline-block group">
-              <div className="absolute -inset-12 bg-emerald-500/20 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-              <div className="relative animate-[float_6s_ease-in-out_infinite] flex flex-col items-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.3)] mb-8 transform rotate-6">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <h2 className="text-4xl sm:text-6xl font-black minecraft-font tracking-tighter bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent drop-shadow-2xl">
-                  RAMPART
-                </h2>
+          <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
+            <div className="mb-12 relative float-anim">
+              <div className="absolute inset-0 bg-emerald-500/20 blur-[60px] rounded-full"></div>
+              <div className="relative glass w-20 h-20 sm:w-24 sm:h-24 rounded-[2rem] flex items-center justify-center border border-white/10 shadow-2xl">
+                <svg className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
               </div>
             </div>
-            
-            <div className="space-y-6">
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-white minecraft-font tracking-tight">
-                JUDGMENT DAY
+
+            <div className="space-y-6 max-w-2xl mb-12">
+              <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+                Justice through <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Clarity.</span>
               </h1>
-              <p className="text-gray-400 max-w-lg mx-auto text-sm sm:text-lg leading-relaxed font-light italic">
-                "Every soul deserves a trial. Most deserve the void."
+              <p className="text-gray-400 text-base sm:text-lg leading-relaxed font-medium">
+                The Rampart automated redemption system handles ban appeals with integrity. Start your identification to submit a plea.
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
               <button 
                 onClick={handleLogin} 
-                className="px-12 py-5 bg-emerald-500 text-white font-bold rounded-2xl shadow-2xl shadow-emerald-500/20 hover:bg-emerald-400 active:scale-[0.97] transition-all flex items-center justify-center gap-3"
+                className="group relative px-8 py-4 bg-white text-black font-bold rounded-2xl hover:bg-emerald-500 hover:text-white transition-all duration-300 flex items-center gap-3 shadow-xl overflow-hidden"
               >
-                Identify Soul (Google)
+                <span className="relative z-10">Identify with Google</span>
+                <svg className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
               </button>
               <button 
                 onClick={handleContinueAsGuest} 
-                className="px-12 py-5 bg-white/5 text-white font-bold rounded-2xl border border-white/10 hover:bg-white/10 active:scale-[0.97] transition-all"
+                className="px-8 py-4 bg-white/5 text-gray-300 font-semibold rounded-2xl border border-white/10 hover:bg-white/10 hover:text-white transition-all active:scale-[0.98]"
               >
-                Confess as Guest
+                Anonymous Plea
               </button>
+            </div>
+            
+            <div className="mt-16 grid grid-cols-3 gap-8 sm:gap-16 opacity-40">
+              <div className="flex flex-col gap-1">
+                <span className="text-xl font-bold text-white">24/7</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold">Review</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xl font-bold text-white">AI</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold">Analysis</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xl font-bold text-white">MOD</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold">Registry</span>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="animate-in fade-in slide-in-from-bottom-6 duration-1000">
             {activeTab === 'admin' && user.isAdmin ? <AdminDashboard /> : <AppealForm user={user} />}
           </div>
         )}
       </main>
 
-      <footer className="mt-16 py-12 text-center opacity-40 text-[10px] uppercase font-bold tracking-[0.6em] text-gray-500 border-t border-white/5">
-        RAMPART | SMP | REDEMPTION SYSTEM
+      <footer className="mt-24 py-12 border-t border-white/5">
+        <div className="container mx-auto px-6 max-w-6xl flex flex-col sm:flex-row justify-between items-center gap-6">
+          <span className="text-[10px] uppercase tracking-[0.4em] font-bold text-gray-500">
+            RAMPART REDEMPTION © 2026
+          </span>
+          <div className="flex gap-8 text-[10px] uppercase tracking-widest font-bold text-gray-600">
+            <a href="#" className="hover:text-emerald-500 transition-colors">Server Rules</a>
+            <a href="#" className="hover:text-emerald-500 transition-colors">Discord</a>
+            <a href="#" className="hover:text-emerald-500 transition-colors">Privacy</a>
+          </div>
+        </div>
       </footer>
     </div>
   );

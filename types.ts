@@ -6,7 +6,6 @@ export interface Appeal {
   username: string;
   reason: string;
   explanation: string;
-  discordTag: string;
   timestamp: number;
   status: AppealStatus;
   userEmail: string;
