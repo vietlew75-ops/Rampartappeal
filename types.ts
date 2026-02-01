@@ -1,0 +1,23 @@
+
+export type AppealStatus = 'pending' | 'approved' | 'denied';
+
+export interface Appeal {
+  id: string;
+  username: string;
+  reason: string;
+  explanation: string;
+  discordTag: string;
+  timestamp: number;
+  status: AppealStatus;
+  userEmail: string;
+  adminNote?: string;
+  isGuestAppeal?: boolean;
+}
+
+export interface UserState {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  isAdmin: boolean;
+  isGuest: boolean;
+}

@@ -1,0 +1,5 @@
+{
+  "name": "RampartSMP Ban Appeals",
+  "description": "A high-performance, glassmorphic Minecraft server ban appeal system with real-time Firestore integration and administrative dashboard for server owners.",
+  "requestFramePermissions": []
+}
