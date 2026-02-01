@@ -6,9 +6,6 @@ import Header from './components/Header';
 import AppealForm from './components/AppealForm';
 import AdminDashboard from './components/AdminDashboard';
 
-// Use string paths for assets to avoid ESM module resolution errors in the browser
-const logo = './logo.png';
-
 const ADMIN_EMAIL = 'lewooon959@gmail.com';
 
 const App: React.FC = () => {
@@ -96,12 +93,17 @@ const App: React.FC = () => {
         {!user ? (
           <div className="glass p-12 sm:p-24 rounded-[3rem] text-center space-y-16 shadow-2xl transition-all duration-700 border-white/5">
             <div className="relative inline-block group">
-              <div className="absolute -inset-12 bg-emerald-500/10 rounded-full blur-[100px] opacity-0 group-hover:opacity-100 transition duration-1000"></div>
-              <img 
-                src={logo} 
-                alt="Rampart" 
-                className="relative max-w-[280px] sm:max-w-[420px] mx-auto drop-shadow-[0_25px_60px_rgba(16,185,129,0.25)] animate-[float_6s_ease-in-out_infinite]"
-              />
+              <div className="absolute -inset-12 bg-emerald-500/20 rounded-full blur-[100px] opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+              <div className="relative animate-[float_6s_ease-in-out_infinite] flex flex-col items-center">
+                <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(16,185,129,0.3)] mb-8 transform rotate-6">
+                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h2 className="text-4xl sm:text-6xl font-black minecraft-font tracking-tighter bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent drop-shadow-2xl">
+                  RAMPART
+                </h2>
+              </div>
             </div>
             
             <div className="space-y-6">
