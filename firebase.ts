@@ -1,7 +1,8 @@
-// Ensure imports are from the correct modular SDK paths
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+
+// Use Firebase Compat API to avoid issues with missing named exports in some environments
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import 'firebase/compat/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAoidmhvxHmuEcy2o-jqMhITcdtT0NUmBg",
@@ -13,13 +14,17 @@ const firebaseConfig = {
   measurementId: "G-8QRKTW2LJ6"
 };
 
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase using compat layer
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// Initialize Firestore using the modular getFirestore function
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+export const db = firebase.firestore();
+export const auth = firebase.auth();
+export const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
+
+export default firebase;
