@@ -29,6 +29,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
 
       if (!identifier) return;
 
+      // Removed server-side order to prevent index requirement failures
       db.collection("appeals")
         .where(field, "==", identifier)
         .onSnapshot((snapshot) => {
@@ -37,6 +38,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             ...doc.data()
           } as Appeal));
           
+          // Sort in memory for reliability
           const sorted = appealsData.sort((a, b) => b.timestamp - a.timestamp);
           setMyAppeals(sorted);
         }, (error) => {
@@ -69,15 +71,16 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     };
 
     try {
+      console.log("Attempting to log appeal to Firestore...");
       const docRef = await db.collection("appeals").add(newAppealData);
-      console.info("Appeal Successfully Logged to Firestore. ID:", docRef.id);
+      console.info("SUCCESS: Document ID", docRef.id);
       
       setSuccess(true);
       setFormData({ username: '', reason: '', explanation: '', manualEmail: '' });
       setTimeout(() => setSuccess(false), 8000);
     } catch (error) {
-      console.error("CRITICAL: Error adding appeal to Firestore:", error);
-      alert("Database write failed. This usually means your Firestore Security Rules are blocking access.");
+      console.error("CRITICAL FIRESTORE ERROR:", error);
+      alert("Database error. Ensure your Firestore rules allow writes to the 'appeals' collection.");
     } finally {
       setSubmitting(false);
     }
@@ -85,9 +88,9 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
 
   const getStatusDisplay = (status: string) => {
     switch (status) {
-      case 'pending': return { label: 'Pending Review', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' };
+      case 'pending': return { label: 'In Queue', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' };
       case 'approved': return { label: 'Redeemed', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
-      case 'denied': return { label: 'Judgment Final', color: 'text-red-400 bg-red-400/10 border-red-400/20' };
+      case 'denied': return { label: 'Rejected', color: 'text-red-400 bg-red-400/10 border-red-400/20' };
       default: return { label: 'Unknown', color: 'text-gray-400 bg-gray-400/10 border-gray-400/20' };
     }
   };
