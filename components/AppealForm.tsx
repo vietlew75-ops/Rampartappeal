@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-// Combine Firestore modular imports into a single line for better module resolution
+// Fix: Correct modular imports from firebase/firestore
 import { addDoc, collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from '../firebase';
 import { UserState, Appeal } from '../types';

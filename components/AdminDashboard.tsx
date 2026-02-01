@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-// Combine all Firestore modular functions into a single named import line
+// Fix: Correct modular imports from firebase/firestore
 import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import { db } from '../firebase';
 import { Appeal } from '../types';
@@ -36,9 +35,9 @@ const AdminDashboard: React.FC = () => {
     setAiAnalyzing(true);
     setAiInsight(null);
     try {
-      // Create new GoogleGenAI instance right before making the call as per guidelines
+      // Fix: Ensure GoogleGenAI instance is created right before making the call as per guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      // Explicitly type the response to GenerateContentResponse
+      // Request AI analysis using the gemini-3-pro-preview model
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: `Analyze this Minecraft ban appeal for honesty and remorse. Be direct.
@@ -50,7 +49,7 @@ const AdminDashboard: React.FC = () => {
           systemInstruction: "You are a senior community admin. Identify lies or genuine regret. Provide a 2-sentence verdict."
         }
       });
-      // Access .text property directly (not as a method)
+      // Correct: Accessing text property directly
       setAiInsight(response.text || "Analysis complete.");
     } catch (error) {
       console.error("Gemini analysis failed:", error);
