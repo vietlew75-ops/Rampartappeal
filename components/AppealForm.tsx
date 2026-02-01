@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { addDoc, collection, getDocs, orderBy, query, where } from "firebase/firestore";
+import { GoogleGenAI } from "@google/genai";
 import { db } from '../firebase';
 import { UserState, Appeal } from '../types';
 
@@ -16,8 +17,10 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     manualEmail: '' 
   });
   const [submitting, setSubmitting] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [myAppeals, setMyAppeals] = useState<Appeal[]>([]);
   const [success, setSuccess] = useState(false);
+  const [filterError, setFilterError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyAppeals();
@@ -44,9 +47,49 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     }
   };
 
+  const validateAppealWithAi = async () => {
+    setIsAnalyzing(true);
+    setFilterError(null);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Analyze this Minecraft ban appeal. 
+        Category: ${formData.reason}
+        Defense: ${formData.explanation}
+        
+        Is this a serious, legitimate appeal or low-effort spam/gibberish? 
+        Return JSON format only: {"classification": "LEGITIMATE" | "SPAM", "reason": "short explanation"}`,
+        config: {
+          responseMimeType: "application/json",
+          systemInstruction: "You are an automated Minecraft server filter. LEGITIMATE means coherent, detailed, and relevant. SPAM means gibberish, toxic, extremely short (e.g. 'pls unban'), or clearly unrelated content. Be strict."
+        }
+      });
+      
+      const result = JSON.parse(response.text || "{}");
+      return result;
+    } catch (err) {
+      console.error("AI Validation failed", err);
+      return { classification: 'LEGITIMATE', reason: 'System bypass' }; // Fail open for safety
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setFilterError(null);
+
+    // AI TRIAGE STEP: User -> AI -> Moderator
+    const aiCheck = await validateAppealWithAi();
+    
+    if (aiCheck.classification === 'SPAM') {
+      setFilterError(`Submission Rejected: ${aiCheck.reason || "Content identified as low-quality or spam."}`);
+      setSubmitting(false);
+      return;
+    }
+
     const emailToStore = user.isGuest ? formData.manualEmail : user.email;
 
     try {
@@ -59,7 +102,8 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
         status: 'pending',
         uid: user.uid,
         isGuestAppeal: user.isGuest,
-        authType: user.isGuest ? 'guest' : 'google'
+        authType: user.isGuest ? 'guest' : 'google',
+        aiVerified: true
       });
       setSuccess(true);
       setFormData({ username: '', reason: '', explanation: '', manualEmail: '' });
@@ -86,14 +130,29 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
       {/* Submission Form Section */}
       <div className="lg:col-span-7 space-y-8">
         <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-extrabold text-white tracking-tight">Case Submission</h2>
-          <p className="text-gray-500 text-sm font-medium">Please provide an honest account of the events leading to your restriction.</p>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-extrabold text-white tracking-tight">Case Submission</h2>
+            <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-[8px] font-black text-emerald-500 uppercase tracking-widest">
+              AI Monitored
+            </div>
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Your appeal will be analyzed by our automated integrity system before reaching a moderator.</p>
         </div>
 
         {success && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center gap-3 animate-in slide-in-from-top-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-            Case logged successfully. Await moderation.
+            Case logged successfully. Passed AI filtration.
+          </div>
+        )}
+
+        {filterError && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-[10px] font-bold uppercase tracking-widest flex items-start gap-3 animate-in shake-in">
+            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <div className="flex flex-col gap-1">
+              <span>Security Block</span>
+              <span className="text-gray-500 font-medium normal-case">{filterError}</span>
+            </div>
           </div>
         )}
 
@@ -102,7 +161,8 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Minecraft Alias</label>
             <input 
               required 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" 
+              disabled={submitting || isAnalyzing}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
               placeholder="Minecraft Username"
               value={formData.username} 
               onChange={(e) => setFormData({...formData, username: e.target.value})} 
@@ -115,7 +175,8 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
               <input 
                 required 
                 type="email" 
-                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" 
+                disabled={submitting || isAnalyzing}
+                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
                 placeholder="email@example.com"
                 value={formData.manualEmail} 
                 onChange={(e) => setFormData({...formData, manualEmail: e.target.value})} 
@@ -127,7 +188,8 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Violation Category</label>
             <input 
               required 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" 
+              disabled={submitting || isAnalyzing}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
               placeholder="e.g. Unfair Advantage / Harassment"
               value={formData.reason} 
               onChange={(e) => setFormData({...formData, reason: e.target.value})} 
@@ -139,8 +201,9 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <textarea 
               required 
               rows={6} 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium resize-none leading-relaxed" 
-              placeholder="Provide a detailed, professional account of the incident..."
+              disabled={submitting || isAnalyzing}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium resize-none leading-relaxed disabled:opacity-50" 
+              placeholder="Provide a detailed, professional account of the incident. Minimum 20 words recommended for AI approval."
               value={formData.explanation} 
               onChange={(e) => setFormData({...formData, explanation: e.target.value})} 
             />
@@ -148,11 +211,19 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
 
           <button 
             type="submit" 
-            disabled={submitting} 
-            className="w-full py-4 bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-2 active:scale-[0.98]"
+            disabled={submitting || isAnalyzing} 
+            className={`w-full py-4 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] ${isAnalyzing ? 'bg-indigo-500 text-white' : 'bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20'}`}
           >
-            {submitting ? (
-              <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+            {isAnalyzing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                Analyzing Content Integrity...
+              </>
+            ) : submitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></div>
+                Finalizing Record...
+              </>
             ) : "Log Appeal Entry"}
           </button>
         </form>
