@@ -11,6 +11,9 @@ export interface Appeal {
   userEmail: string;
   adminNote?: string;
   isGuestAppeal?: boolean;
+  ai_flag?: 'spam' | 'clean';
+  aiVerified?: boolean;
+  authType?: 'guest' | 'google';
 }
 
 export interface UserState {
