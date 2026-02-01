@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { db } from '../firebase';
 import { UserState, Appeal } from '../types';
 
@@ -16,9 +15,8 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     manualEmail: '' 
   });
   const [submitting, setSubmitting] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [myAppeals, setMyAppeals] = useState<Appeal[]>([]);
-  const [success, setSuccess] = useState<'legit' | 'flagged' | null>(null);
+  const [success, setSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     fetchMyAppeals();
@@ -49,41 +47,13 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     }
   };
 
-  const triageWithAi = async () => {
-    setIsAnalyzing(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Analyze this Minecraft ban appeal for triage.
-        Reason: ${formData.reason}
-        Explanation: ${formData.explanation}
-        
-        Return JSON: {"classification": "LEGITIMATE" | "SPAM"}`,
-        config: {
-          responseMimeType: "application/json",
-          systemInstruction: "You are a triage filter. LEGITIMATE means a real attempt to appeal. SPAM means gibberish, toxic, or low-effort junk. If you are unsure, choose LEGITIMATE."
-        }
-      });
-      const text = response.text || '{"classification": "LEGITIMATE"}';
-      return JSON.parse(text);
-    } catch (err) {
-      console.warn("AI Triage failed, defaulting to LEGITIMATE", err);
-      return { classification: 'LEGITIMATE' };
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting || isAnalyzing) return;
+    if (submitting) return;
     
     setSubmitting(true);
-    setSuccess(null);
+    setSuccess(false);
 
-    const triage = await triageWithAi();
-    const isSpam = triage.classification === 'SPAM';
     const emailToStore = user.isGuest ? formData.manualEmail : user.email;
 
     const newAppealData = {
@@ -95,19 +65,16 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
       status: 'pending',
       uid: user.uid,
       isGuestAppeal: user.isGuest,
-      ai_flag: isSpam ? 'spam' : 'clean',
-      aiVerified: true,
       authType: user.isGuest ? 'guest' : 'google'
     };
 
     try {
       const docRef = await db.collection("appeals").add(newAppealData);
       console.info("Appeal Successfully Logged to Firestore. ID:", docRef.id);
-      console.table(newAppealData);
       
-      setSuccess(isSpam ? 'flagged' : 'legit');
+      setSuccess(true);
       setFormData({ username: '', reason: '', explanation: '', manualEmail: '' });
-      setTimeout(() => setSuccess(null), 8000);
+      setTimeout(() => setSuccess(false), 8000);
     } catch (error) {
       console.error("CRITICAL: Error adding appeal to Firestore:", error);
       alert("Database write failed. This usually means your Firestore Security Rules are blocking access.");
@@ -116,8 +83,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     }
   };
 
-  const getStatusDisplay = (status: string, aiFlag?: string) => {
-    if (aiFlag === 'spam') return { label: 'Audit Required', color: 'text-red-400 bg-red-400/10 border-red-400/20' };
+  const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'pending': return { label: 'Pending Review', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' };
       case 'approved': return { label: 'Redeemed', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
@@ -131,23 +97,13 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
       <div className="lg:col-span-7 space-y-8">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-extrabold text-white tracking-tight">Case Submission</h2>
-          <p className="text-gray-500 text-sm font-medium">Your submission will be triaged by AI before moderator review.</p>
+          <p className="text-gray-500 text-sm font-medium">Your submission will be queued for manual moderator review.</p>
         </div>
 
-        {success === 'legit' && (
+        {success && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center gap-3 animate-in slide-in-from-top-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-            Case logged successfully. Verification passed.
-          </div>
-        )}
-
-        {success === 'flagged' && (
-          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-start gap-3 animate-in shake-in">
-            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            <div className="flex flex-col gap-1">
-              <span>Manual Audit Triggered</span>
-              <span className="text-gray-500 font-medium normal-case">Content flagged as low-quality/spam. It will be sent to a moderator but may be deprioritized.</span>
-            </div>
+            Case logged successfully. Waiting for review.
           </div>
         )}
 
@@ -156,7 +112,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Minecraft Alias</label>
             <input 
               required 
-              disabled={submitting || isAnalyzing}
+              disabled={submitting}
               className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
               placeholder="Username"
               value={formData.username} 
@@ -170,7 +126,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
               <input 
                 required 
                 type="email" 
-                disabled={submitting || isAnalyzing}
+                disabled={submitting}
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
                 placeholder="email@example.com"
                 value={formData.manualEmail} 
@@ -183,7 +139,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Violation</label>
             <input 
               required 
-              disabled={submitting || isAnalyzing}
+              disabled={submitting}
               className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
               placeholder="Reason for ban"
               value={formData.reason} 
@@ -196,7 +152,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
             <textarea 
               required 
               rows={6} 
-              disabled={submitting || isAnalyzing}
+              disabled={submitting}
               className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium resize-none leading-relaxed disabled:opacity-50" 
               placeholder="Detailed explanation..."
               value={formData.explanation} 
@@ -206,10 +162,10 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
 
           <button 
             type="submit" 
-            disabled={submitting || isAnalyzing} 
-            className={`w-full py-4 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] ${isAnalyzing ? 'bg-indigo-500 text-white' : 'bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20'}`}
+            disabled={submitting} 
+            className="w-full py-4 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20"
           >
-            {isAnalyzing ? "Triaging Case..." : submitting ? "Logging Case..." : "Log Appeal Entry"}
+            {submitting ? "Logging Case..." : "Log Appeal Entry"}
           </button>
         </form>
       </div>
@@ -223,7 +179,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
         ) : (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
             {myAppeals.map((appeal) => {
-              const status = getStatusDisplay(appeal.status, appeal.ai_flag);
+              const status = getStatusDisplay(appeal.status);
               return (
                 <div key={appeal.id} className="glass p-6 rounded-2xl border-l-2 border-white/10 hover:border-emerald-500/50 transition-all">
                   <div className="flex justify-between items-start mb-4">

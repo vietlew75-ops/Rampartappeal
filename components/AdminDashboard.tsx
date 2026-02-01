@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { db } from '../firebase';
 import { Appeal } from '../types';
 
@@ -9,8 +8,6 @@ const AdminDashboard: React.FC = () => {
   const [selectedAppeal, setSelectedAppeal] = useState<Appeal | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [loading, setLoading] = useState(true);
-  const [aiAnalyzing, setAiAnalyzing] = useState(false);
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'error' | 'connected'>('idle');
 
   useEffect(() => {
@@ -21,7 +18,6 @@ const AdminDashboard: React.FC = () => {
       .orderBy("timestamp", "desc")
       .onSnapshot((snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appeal));
-        console.log(`Admin Dashboard: ${data.length} records received from Firestore.`);
         setAppeals(data);
         setLoading(false);
         setStatus('connected');
@@ -33,31 +29,6 @@ const AdminDashboard: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
-
-  const handleAiAnalyze = async () => {
-    if (!selectedAppeal) return;
-    setAiAnalyzing(true);
-    setAiInsight(null);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Analyze this Minecraft ban appeal for honesty and remorse. Be direct.
-        Username: ${selectedAppeal.username}
-        Reason: ${selectedAppeal.reason}
-        Explanation: ${selectedAppeal.explanation}`,
-        config: {
-          systemInstruction: "You are an elite community moderator. Identify manipulation, lies, or genuine regret. Provide a critical, professional verdict in exactly 2 short sentences."
-        }
-      });
-      setAiInsight(response.text || "Analysis complete.");
-    } catch (error) {
-      console.error("Gemini failed", error);
-      setAiInsight("AI insight currently unavailable.");
-    } finally {
-      setAiAnalyzing(false);
-    }
-  };
 
   const handleUpdateStatus = async (status: 'approved' | 'denied') => {
     if (!selectedAppeal) return;
@@ -100,7 +71,7 @@ const AdminDashboard: React.FC = () => {
             <div className="p-12 glass rounded-2xl border-dashed border border-white/5 text-center">
               <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest leading-loose">
                 No appeals registered.<br/>
-                <span className="text-gray-700 normal-case italic">Check console (F12) for database errors.</span>
+                <span className="text-gray-700 normal-case italic">Awaiting new submissions.</span>
               </p>
             </div>
           ) : (
@@ -109,22 +80,16 @@ const AdminDashboard: React.FC = () => {
                 key={appeal.id} 
                 onClick={() => {
                   setSelectedAppeal(appeal);
-                  setAiInsight(null);
                 }} 
                 className={`w-full text-left p-4 rounded-xl transition-all border flex flex-col gap-1.5 ${selectedAppeal?.id === appeal.id ? 'glass border-emerald-500/40' : 'bg-white/[0.01] border-white/5 hover:border-white/10'}`}
               >
                 <div className="flex justify-between items-center">
                   <span className="font-black text-xs text-white uppercase tracking-tight">{appeal.username}</span>
-                  <div className="flex gap-1.5">
-                    {appeal.ai_flag === 'spam' && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Flagged as Spam" />
-                    )}
-                    <div className={`w-1.5 h-1.5 rounded-full ${appeal.status === 'approved' ? 'bg-emerald-500' : appeal.status === 'denied' ? 'bg-red-500' : 'bg-amber-500'}`} />
-                  </div>
+                  <div className={`w-1.5 h-1.5 rounded-full ${appeal.status === 'approved' ? 'bg-emerald-500' : appeal.status === 'denied' ? 'bg-red-500' : 'bg-amber-500'}`} />
                 </div>
                 <div className="flex justify-between items-end">
-                  <span className={`text-[8px] font-bold uppercase tracking-widest ${appeal.ai_flag === 'spam' ? 'text-red-500' : 'text-gray-500'}`}>
-                    {appeal.ai_flag === 'spam' ? 'Suspected Spam' : appeal.status}
+                  <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">
+                    {appeal.status}
                   </span>
                   <span className="text-[8px] text-gray-600 font-mono">{new Date(appeal.timestamp).toLocaleDateString()}</span>
                 </div>
@@ -143,21 +108,9 @@ const AdminDashboard: React.FC = () => {
                 <h2 className="text-2xl font-black text-white uppercase tracking-tight leading-none">{selectedAppeal.username}</h2>
                 <span className="text-[10px] text-emerald-500/60 font-bold uppercase tracking-widest">{selectedAppeal.userEmail}</span>
               </div>
-              
-              <button 
-                onClick={handleAiAnalyze}
-                disabled={aiAnalyzing}
-                className={`group flex items-center gap-3 px-4 py-2 border rounded-lg transition-all duration-300 ${selectedAppeal.ai_flag === 'spam' ? 'bg-red-500/5 border-red-500/20 text-red-500' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'}`}
-              >
-                {aiAnalyzing ? (
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.989-2.386l-.548-.547z"/></svg>
-                )}
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                  {selectedAppeal.ai_flag === 'spam' ? "Analyze Spam" : "AI Intelligence"}
-                </span>
-              </button>
+              <div className="px-3 py-1 bg-white/5 rounded-lg border border-white/10 text-[8px] font-black uppercase tracking-widest text-gray-500">
+                Manual Audit
+              </div>
             </div>
 
             <div className="p-8 space-y-8">
@@ -176,12 +129,6 @@ const AdminDashboard: React.FC = () => {
                   <p className="text-sm text-gray-300 italic leading-relaxed">"{selectedAppeal.explanation}"</p>
                 </div>
               </div>
-
-              {aiInsight && (
-                <div className="p-5 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl">
-                  <p className="text-[11px] text-indigo-100 font-medium italic">"{aiInsight}"</p>
-                </div>
-              )}
 
               {selectedAppeal.status === 'pending' ? (
                 <div className="pt-4 space-y-4">
@@ -202,6 +149,9 @@ const AdminDashboard: React.FC = () => {
                   <div className={`px-4 py-1.5 inline-block rounded-full text-[10px] font-black uppercase tracking-[0.3em] border ${selectedAppeal.status === 'approved' ? 'text-emerald-500 border-emerald-500/30' : 'text-red-500 border-red-500/30'}`}>
                     Verdict: {selectedAppeal.status}
                   </div>
+                  {selectedAppeal.adminNote && (
+                    <p className="mt-4 text-[10px] text-gray-500 italic">"{selectedAppeal.adminNote}"</p>
+                  )}
                 </div>
               )}
             </div>

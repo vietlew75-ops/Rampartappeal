@@ -135,8 +135,8 @@ const App: React.FC = () => {
                 <span className="text-[10px] uppercase tracking-widest font-bold">Review</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xl font-bold text-white">AI</span>
-                <span className="text-[10px] uppercase tracking-widest font-bold">Analysis</span>
+                <span className="text-xl font-bold text-white">LIVE</span>
+                <span className="text-[10px] uppercase tracking-widest font-bold">Updates</span>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xl font-bold text-white">MOD</span>
