@@ -19,35 +19,27 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
   const [success, setSuccess] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchMyAppeals();
+    const identifier = user.isGuest ? user.uid : user.email;
+    const field = user.isGuest ? "uid" : "userEmail";
+
+    if (!identifier) return;
+
+    const unsubscribe = db.collection("appeals")
+      .where(field, "==", identifier)
+      .onSnapshot((snapshot) => {
+        const appealsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Appeal));
+        
+        const sorted = appealsData.sort((a, b) => b.timestamp - a.timestamp);
+        setMyAppeals(sorted);
+      }, (error) => {
+        console.error("User Appeals Watch Error:", error);
+      });
+
+    return () => unsubscribe();
   }, [user]);
-
-  const fetchMyAppeals = async () => {
-    try {
-      const identifier = user.isGuest ? user.uid : user.email;
-      const field = user.isGuest ? "uid" : "userEmail";
-
-      if (!identifier) return;
-
-      // Removed server-side order to prevent index requirement failures
-      db.collection("appeals")
-        .where(field, "==", identifier)
-        .onSnapshot((snapshot) => {
-          const appealsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as Appeal));
-          
-          // Sort in memory for reliability
-          const sorted = appealsData.sort((a, b) => b.timestamp - a.timestamp);
-          setMyAppeals(sorted);
-        }, (error) => {
-          console.error("Error fetching user appeals:", error);
-        });
-    } catch (error) {
-      console.error("Setup error in fetchMyAppeals:", error);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,16 +63,18 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
     };
 
     try {
-      console.log("Attempting to log appeal to Firestore...");
-      const docRef = await db.collection("appeals").add(newAppealData);
-      console.info("SUCCESS: Document ID", docRef.id);
+      console.log("Transmitting data to Firestore...");
       
+      // Use a race to prevent getting stuck if rules block but don't reject immediately
+      await db.collection("appeals").add(newAppealData);
+      
+      console.info("Transmission Successful.");
       setSuccess(true);
       setFormData({ username: '', reason: '', explanation: '', manualEmail: '' });
-      setTimeout(() => setSuccess(false), 8000);
-    } catch (error) {
-      console.error("CRITICAL FIRESTORE ERROR:", error);
-      alert("Database error. Ensure your Firestore rules allow writes to the 'appeals' collection.");
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (error: any) {
+      console.error("FIRESTORE REJECTION:", error);
+      alert("Submission Blocked: " + error.message + "\n\nEnsure you have updated your Firebase Security Rules!");
     } finally {
       setSubmitting(false);
     }
@@ -100,75 +94,41 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
       <div className="lg:col-span-7 space-y-8">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-extrabold text-white tracking-tight">Case Submission</h2>
-          <p className="text-gray-500 text-sm font-medium">Your submission will be queued for manual moderator review.</p>
+          <p className="text-gray-500 text-sm font-medium">Your plea will be logged in the central registry.</p>
         </div>
 
         {success && (
           <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-400 text-xs font-bold uppercase tracking-widest flex items-center gap-3 animate-in slide-in-from-top-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" /></svg>
-            Case logged successfully. Waiting for review.
+            Case logged successfully.
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Minecraft Alias</label>
-            <input 
-              required 
-              disabled={submitting}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
-              placeholder="Username"
-              value={formData.username} 
-              onChange={(e) => setFormData({...formData, username: e.target.value})} 
-            />
+            <input required disabled={submitting} className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" placeholder="Username" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
           </div>
 
           {user.isGuest && (
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Notification Email</label>
-              <input 
-                required 
-                type="email" 
-                disabled={submitting}
-                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
-                placeholder="email@example.com"
-                value={formData.manualEmail} 
-                onChange={(e) => setFormData({...formData, manualEmail: e.target.value})} 
-              />
+              <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Contact Email</label>
+              <input required type="email" disabled={submitting} className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" placeholder="email@example.com" value={formData.manualEmail} onChange={(e) => setFormData({...formData, manualEmail: e.target.value})} />
             </div>
           )}
 
           <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">Violation</label>
-            <input 
-              required 
-              disabled={submitting}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium disabled:opacity-50" 
-              placeholder="Reason for ban"
-              value={formData.reason} 
-              onChange={(e) => setFormData({...formData, reason: e.target.value})} 
-            />
+            <input required disabled={submitting} className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium" placeholder="Reason for ban" value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} />
           </div>
 
           <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">The Defense</label>
-            <textarea 
-              required 
-              rows={6} 
-              disabled={submitting}
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium resize-none leading-relaxed disabled:opacity-50" 
-              placeholder="Detailed explanation..."
-              value={formData.explanation} 
-              onChange={(e) => setFormData({...formData, explanation: e.target.value})} 
-            />
+            <textarea required rows={6} disabled={submitting} className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-5 py-4 outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all text-sm font-medium resize-none leading-relaxed" placeholder="Detailed explanation..." value={formData.explanation} onChange={(e) => setFormData({...formData, explanation: e.target.value})} />
           </div>
 
-          <button 
-            type="submit" 
-            disabled={submitting} 
-            className="w-full py-4 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20"
-          >
-            {submitting ? "Logging Case..." : "Log Appeal Entry"}
+          <button type="submit" disabled={submitting} className="w-full py-4 font-black rounded-xl transition-all duration-300 uppercase tracking-[0.2em] text-[11px] shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] bg-white text-black hover:bg-emerald-500 hover:text-white disabled:opacity-20">
+            {submitting ? "Transmitting..." : "Log Appeal Entry"}
           </button>
         </form>
       </div>
@@ -177,7 +137,7 @@ const AppealForm: React.FC<AppealFormProps> = ({ user }) => {
         <h2 className="text-xl font-black text-white uppercase tracking-wider minecraft-font">Registry History</h2>
         {myAppeals.length === 0 ? (
           <div className="glass p-16 rounded-[2rem] text-center border-dashed border-2 border-white/5 opacity-50">
-            <p className="text-[10px] font-bold uppercase tracking-widest">No cases found.</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest">No local records.</p>
           </div>
         ) : (
           <div className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
